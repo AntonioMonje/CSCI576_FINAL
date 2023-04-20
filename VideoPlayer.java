@@ -61,6 +61,9 @@ public class VideoPlayer {
             case 3:
                 scenePercentage = 0.6;
                 break;
+            default:
+                scenePercentage = 0;
+                break;
             // Add more cases if needed
         }
     
@@ -68,12 +71,18 @@ public class VideoPlayer {
             case 1:
                 shotPercentage = 0.2;
                 break;
+            default:
+                scenePercentage = 0;
+                break;
             // Add more cases if needed
         }
     
         switch (subshot) {
             case 1:
                 subshotPercentage = 0.2;
+                break;
+            default:
+                scenePercentage = 0;
                 break;
             // Add more cases if needed
         }
@@ -84,8 +93,6 @@ public class VideoPlayer {
     
         currentFrame = sceneFrame + shotFrame + subshotFrame;
     }
-
-
 
     public static void main(String[] args) {
         File file = new File("./InputVideo.rgb");
@@ -205,6 +212,15 @@ public class VideoPlayer {
         });
         controlPanel.add(pauseButton);
 
+
+        JButton stopButton = new JButton("Stop");
+        stopButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                pauseButton.doClick();
+                jumpToFrame(0,0,0, 0);
+            }
+        });
+        controlPanel.add(stopButton);
 
         String strFilename = "./InputAudio.wav";
 
