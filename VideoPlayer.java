@@ -23,6 +23,8 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.ActionEvent;
 import javax.swing.ImageIcon;
+
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -41,6 +43,7 @@ import java.io.InputStream;
 import java.io.FileInputStream;
 import javax.imageio.stream.FileImageInputStream;
 import javax.swing.table.DefaultTableModel;
+import java.util.ArrayList;
 
 
 public class VideoPlayer {
@@ -126,42 +129,47 @@ public class VideoPlayer {
         String shot = "";
         String subshot = "";
 
-        //if(tableModel.getRowCount() == 0){
-        //    tableModel.addRow(new Object[]{movie,"","",""});
-        //}
-
         String currentScene = "";
         String currentShot = "";
         String currentSubshot = "";
+
+       
 
         for(int i = 0; i < data.length; i++){
             scene = extractScene(data[i], currentSceneValue);
             shot = extractShot(data[i], currentShotValue);
             subshot = extractSubshot(data[i],currentSubshotValue);
-            
+  
             //check for new scene
             if(!scene.equals(currentScene)){
                 tableModel.addRow(new Object[]{"Scene " + scene, "", ""});
                 currentScene = scene;
+                currentSceneValue++;
                 currentShot = "";
+                currentShotValue = 0;
                 currentSubshot = "";
+                currentSubshotValue = 0;
             }
 
             //check for new shot
             if(!shot.equals(currentShot)){
                 tableModel.addRow(new Object[]{"", "shot " + shot, ""});
                 currentShot = shot;
+                currentShotValue++;
                 currentSubshot = "";
+                currentSubshotValue = 0;
             }
 
              //check for new subshot
              if(!subshot.equals(currentSubshot)){
                 tableModel.addRow(new Object[]{"", "", "subshot " + subshot});
                 currentSubshot = subshot;
+                currentSubshotValue++;
             }
             
             //tableModel.addRow(new Object[]{scene, shot, subshot});
         }
+
         return tableModel;
     }
    
@@ -169,19 +177,27 @@ public class VideoPlayer {
 
     private static String extractScene(byte videoData, int currentSceneValue){
         int sceneValue = (videoData & 0xC0) >> 6;
-        currentSceneValue += sceneValue + 1;
+        if(sceneValue > 0){
+            currentSceneValue += sceneValue;
+        }
+        
         return String.valueOf(currentSceneValue);
     }
 
     private static String extractShot(byte videoData, int currentShotValue){
         int shotValue = (videoData & 0x38) >> 3;
-        currentShotValue += shotValue + 1;
+        if(shotValue > 0){
+            currentShotValue += shotValue;
+        }
+        
         return String.valueOf(currentShotValue);
     }
 
     private static String extractSubshot(byte videoData, int currentSubshotValue){
         int subshotValue = videoData & 0x07;
-        currentSubshotValue += subshotValue + 1;
+        if(subshotValue > 0){
+            currentSubshotValue += subshotValue;
+        }
         return String.valueOf(currentSubshotValue);
     }
 
