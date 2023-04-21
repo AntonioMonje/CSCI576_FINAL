@@ -110,6 +110,11 @@ public class VideoPlayer {
 
     public static DefaultTableModel extractVideoMetaData(String filePath, int currentFrame)
     {
+        int width = 480;
+        int height = 270;
+        int fps = 30;
+        int numFrames = 8682;
+        int threshold = 1000;
         //read the video frames
        byte[] data = readRGBFile(filePath, currentFrame);
 
@@ -133,9 +138,9 @@ public class VideoPlayer {
         String currentShot = "";
         String currentSubshot = "";
 
-       
+       List<Integer> sceneChanges = detectScenes(filePath, width, height, numFrames, threshold);
 
-        for(int i = 0; i < data.length; i++){
+        for(int i = 0; i < sceneChanges.size(); i++){
             scene = extractScene(data[i], currentSceneValue);
             shot = extractShot(data[i], currentShotValue);
             subshot = extractSubshot(data[i],currentSubshotValue);
@@ -166,8 +171,7 @@ public class VideoPlayer {
                 currentSubshot = subshot;
                 currentSubshotValue++;
             }
-            
-            //tableModel.addRow(new Object[]{scene, shot, subshot});
+
         }
 
         return tableModel;
@@ -206,8 +210,10 @@ public class VideoPlayer {
         int height = 270;
         int fps = 30;
         int numFrames = 8682;
+        //int threshold = 50000;
         File file = new File(filePath);
         byte[] data = null;
+
         try {
             RandomAccessFile raf = new RandomAccessFile(file, "r");
             FileChannel channel = raf.getChannel();
@@ -234,6 +240,37 @@ public class VideoPlayer {
         return data;
     }
 
+    private static List<Integer> detectScenes(String filePath, int width, int height, int numFrames, int threshold){
+        List<Integer> sceneChanges = new ArrayList<>();
+        byte[] prevFrameData = null;
+
+        //loop through each frame
+        for(int frameInd = 0; frameInd < numFrames; frameInd++){
+            byte[] currentFrameData = readRGBFile(filePath, frameInd);
+
+            //differencing
+            if(prevFrameData != null){
+                int numPixels = width * height * 3;
+                int numDiffferentPixels = 0;
+                for(int i = 0; i < numPixels; i++){
+                    if(Math.abs(currentFrameData[i]-prevFrameData[i]) > threshold){
+                        numDiffferentPixels++;
+                    }
+                }
+                
+                System.out.println("Frame " + frameInd + ": " + numDiffferentPixels + " different pixels");
+                //if pixels exceed threshold probably a new scene
+                if(numDiffferentPixels > threshold){
+                    sceneChanges.add(frameInd);
+                }
+
+            }
+            prevFrameData = currentFrameData;
+        }
+        return sceneChanges;
+    }
+
+
     public static void main(String[] args) {
         File file = new File("./InputVideo.rgb");
         int width = 480;
@@ -259,34 +296,9 @@ public class VideoPlayer {
         JPanel tablePanel = new JPanel();
         frame.add(tablePanel, BorderLayout.WEST);
 
-/*
-        // Sample data for the table of contents
-        Object[][] data = {
-            {"Scene 1", "Shot 1", "Subshot 1"},
-            {"Scene 1", "Shot 2", ""},
-            {"Scene 1", "Shot 3", ""},
-            {"Scene 2", "Shot 1", ""},
-            {"Scene 2", "Shot 2", ""},
-            {"Scene 2", "Shot 3", "Subshot 1"},
-            {"Scene 3", "Shot 1", ""},
-            {"Scene 3", "Shot 2", "Subshot 1"},
-            {"Scene 3", "Shot 3", ""},
-        };
-
-        // Column names for the table
-        String[] columnNames = {"Scene", "Shot", "Subshot"};
-
-
-        // Create a JTable with the sample data and column names
-        DefaultTableModel tableModel = new DefaultTableModel(data, columnNames);
-        JTable tableOfContents = new JTable(tableModel);
-*/
-
          // Create a JTable with the sample data and column names
          DefaultTableModel tableModel = extractVideoMetaData("./InputVideo.rgb", currentFrame);
          JTable tableOfContents = new JTable(tableModel);
-
-
 
         tableOfContents.addMouseListener(new MouseAdapter() {
             @Override
