@@ -16,10 +16,14 @@ import javax.swing.JPanel;
 import javax.swing.JButton;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.List;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.ActionEvent;
 import javax.swing.ImageIcon;
+
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.Semaphore;
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -176,92 +180,99 @@ public class VideoPlayer {
     
 
     // Add a method to jump to a specific frame
-    public static void jumpToFrame(int scene, int shot, int subshot, int numFrames) {
-        double scenePercentage = 0;
-        double shotPercentage = 0;
-        double subshotPercentage = 0;
-    
-        switch (scene) {
-            case 1:
-                scenePercentage = 0.2;
-                break;
-            case 2:
-                scenePercentage = 0.4;
-                break;
-            case 3:
-                scenePercentage = 0.6;
-                break;
-            default:
-                scenePercentage = 0;
-                break;
-            // Add more cases if needed
+    public static int jumpToFrame(int scene, int shot, int subshot, ArrayList<HashMap<String, Integer>> frameNumbers) {
+        int targetFrame = -1;
+        
+        for (HashMap<String, Integer> frameInfo : frameNumbers) {
+            if (frameInfo.containsKey("scene") && frameInfo.get("scene") == scene) {
+                if (shot == -1) {
+                    targetFrame = frameInfo.get("frame");
+                    break;
+                } else if (frameInfo.containsKey("shot") && frameInfo.get("shot") == shot) {
+                    if (subshot == -1) {
+                        targetFrame = frameInfo.get("frame");
+                        break;
+                    } else if (frameInfo.containsKey("subshot") && frameInfo.get("subshot") == subshot) {
+                        targetFrame = frameInfo.get("frame");
+                        break;
+                    }
+                }
+            }
         }
     
-        switch (shot) {
-            case 1:
-                shotPercentage = 0.2;
-                break;
-            default:
-                scenePercentage = 0;
-                break;
-            // Add more cases if needed
+        if (targetFrame == -1) {
+            System.out.println("No matching scene, shot or subshot found.");
+            return -1;
+        } else {
+            System.out.println("Jumping to frame: " + targetFrame);
+            return targetFrame;
         }
-    
-        switch (subshot) {
-            case 1:
-                subshotPercentage = 0.2;
-                break;
-            default:
-                scenePercentage = 0;
-                break;
-            // Add more cases if needed
-        }
-    
-        int sceneFrame = (int) (numFrames * scenePercentage);
-        int shotFrame = (int) (sceneFrame * shotPercentage);
-        int subshotFrame = (int) (shotFrame * subshotPercentage);
-    
-        currentFrame = sceneFrame + shotFrame + subshotFrame;
     }
 
-    public static DefaultTableModel extractVideoMetaData(String filePath, int currentFrame)
-    {
+    public static class VideoMetaData {
+        public DefaultTableModel tableModel;
+        ArrayList<HashMap<String, Integer>> frameNumbers;
+    
+        public VideoMetaData(DefaultTableModel tableModel, ArrayList<HashMap<String, Integer>> frameNumbers) {
+            this.tableModel = tableModel;
+            this.frameNumbers = frameNumbers;
+        }
+    }
+
+    public static VideoMetaData extractVideoMetaData(String filePath, int currentFrame) {
         int width = 480;
         int height = 270;
         int fps = 30;
         int numFrames = 8682;
-        //create table model to store data
         DefaultTableModel tableModel = new DefaultTableModel();
-        //add columns
         tableModel.addColumn("Scene");
         tableModel.addColumn("Shot");
         tableModel.addColumn("Subshot");
-        
-
+    
+        ArrayList<HashMap<String, Integer>> frameNumbers = new ArrayList<>();
+    
         JFrame frame = new JFrame();
         int[] processed = process(new File(filePath), width, height, fps, numFrames, frame);
         int currentScene = -1;
         int currentShot = -1;
         int currentSubshot = -1;
-        for(int i = 0; i < processed.length; i++){
-            if(processed[i] == 3){
-                //new scene
+    
+        for (int i = 0; i < processed.length; i++) {
+            int currentFrameNumber = i * fps;
+            if (processed[i] == 3) {
                 currentScene++;
                 currentShot = -1;
                 currentSubshot = -1;
-                tableModel.addRow(new Object[]{"Scene " + (currentScene + 1), "", "" });
-            }else if (processed[i] == 2){
+                tableModel.addRow(new Object[]{"Scene " + (currentScene + 1), "", ""});
+    
+                HashMap<String, Integer> sceneFrame = new HashMap<String, Integer>();
+                sceneFrame.put("scene", currentScene);
+                sceneFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(sceneFrame);
+            } else if (processed[i] == 2) {
                 currentShot++;
                 currentSubshot = -1;
-                tableModel.addRow(new Object[]{"", "shot " + (currentShot + 1), "" });
-
-            } else if (processed[i] == 1){
+                tableModel.addRow(new Object[]{"", "Shot " + (currentShot + 1), ""});
+    
+                HashMap<String, Integer> shotFrame = new HashMap<String, Integer>();
+                shotFrame.put("scene", currentScene);
+                shotFrame.put("shot", currentShot);
+                shotFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(shotFrame);
+            } else if (processed[i] == 1) {
                 currentSubshot++;
                 tableModel.addRow(new Object[]{"", "", "Subshot " + (currentSubshot + 1)});
+    
+                HashMap<String, Integer> subshotFrame = new HashMap<String, Integer>();
+                subshotFrame.put("scene", currentScene);
+                subshotFrame.put("shot", currentShot);
+                subshotFrame.put("subshot", currentSubshot);
+                subshotFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(subshotFrame);
             }
         }
-
-        return tableModel;
+    
+        return new VideoMetaData(tableModel, frameNumbers);
     }
    
 
@@ -309,8 +320,8 @@ public class VideoPlayer {
         frame.add(tablePanel, BorderLayout.WEST);
 
          // Create a JTable with the sample data and column names
-        DefaultTableModel tableModel = extractVideoMetaData("./InputVideo.rgb", currentFrame);
-        JTable tableOfContents = new JTable(tableModel);
+         VideoMetaData videoMetaData = extractVideoMetaData("./InputVideo.rgb", currentFrame);
+         JTable tableOfContents = new JTable(videoMetaData.tableModel);
 
         processed = process(file, width, height, fps, numFrames, frame);
         for (int i = 0; i < (int) (numFrames/fps) ; i++) {
@@ -322,30 +333,47 @@ public class VideoPlayer {
         }
 
         tableOfContents.addMouseListener(new MouseAdapter() {
-            @Override
             public void mouseClicked(MouseEvent e) {
-                int row = tableOfContents.rowAtPoint(e.getPoint());
-                int col = tableOfContents.columnAtPoint(e.getPoint());
-        
-                // Check if the clicked cell is in the "Scene" column
-                if (col == 0) {
-                    // Calculate the frame number for the middle of the movie
-            
-                    // Get the values for the clicked row
-                    int scene = Integer.parseInt(tableOfContents.getValueAt(row, 0).toString().split(" ")[1]);
-                    int shot = Integer.parseInt(tableOfContents.getValueAt(row, 1).toString().split(" ")[1]);
-                    int subshot = Integer.parseInt(tableOfContents.getValueAt(row, 2).toString().split(" ")[1]);
+                if (e.getClickCount() == 1) {
+                    int row = tableOfContents.getSelectedRow();
+                    int col = tableOfContents.getSelectedColumn();
                     
-                    // Pause the video
-                    isPaused = true;
-                    sourceLine.flush();
-        
-                    // Jump to the middle of the movie
-                    jumpToFrame(scene, shot, subshot, numFrames);
-        
-                    // Resume playback from the new index
-                    isPaused = false;
-                    playSemaphore.release();
+                    int scene = -1;
+                    int shot = -1;
+                    int subshot = -1;
+            
+                    if (col == 0) {
+                        scene = Integer.parseInt(((String) tableOfContents.getValueAt(row, col)).split(" ")[1]) - 1;
+                    } else if (col == 1) {
+                        shot = Integer.parseInt(((String) tableOfContents.getValueAt(row, col)).split(" ")[1]) - 1;
+                        for (int i = row; i >= 0; i--) {
+                            String cellValue = (String) tableOfContents.getValueAt(i, 0);
+                            if (cellValue != null && !cellValue.isEmpty()) {
+                                scene = Integer.parseInt(cellValue.split(" ")[1]) - 1;
+                                break;
+                            }
+                        }
+                    } else {
+                        subshot = Integer.parseInt(((String) tableOfContents.getValueAt(row, col)).split(" ")[1]) - 1;
+                        for (int i = row; i >= 0; i--) {
+                            String cellValue = (String) tableOfContents.getValueAt(i, 1);
+                            if (cellValue != null && !cellValue.isEmpty()) {
+                                shot = Integer.parseInt(cellValue.split(" ")[1]) - 1;
+                                break;
+                            }
+                        }
+                        for (int i = row; i >= 0; i--) {
+                            String cellValue = (String) tableOfContents.getValueAt(i, 0);
+                            if (cellValue != null && !cellValue.isEmpty()) {
+                                scene = Integer.parseInt(cellValue.split(" ")[1]) - 1;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    System.out.println(scene + " " + shot + " " + subshot);
+                    currentFrame = jumpToFrame(scene, shot, subshot, videoMetaData.frameNumbers);
+                    // Update your targetFrame variable
                 }
             }
         });
@@ -429,7 +457,7 @@ public class VideoPlayer {
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 pauseButton.doClick();
-                jumpToFrame(0,0,0, 0);
+                //jumpToFrame(0,0,0, 0);
             }
         });
         controlPanel.add(stopButton);
