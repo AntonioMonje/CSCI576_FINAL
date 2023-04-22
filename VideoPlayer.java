@@ -114,162 +114,37 @@ public class VideoPlayer {
         int height = 270;
         int fps = 30;
         int numFrames = 8682;
-        int threshold = 1000;
-        //read the video frames
-       byte[] data = readRGBFile(filePath, currentFrame);
-
         //create table model to store data
         DefaultTableModel tableModel = new DefaultTableModel();
         //add columns
-        //tableModel.addColumn("Movie");
+        tableModel.addColumn("Movie");
         tableModel.addColumn("Scene");
         tableModel.addColumn("Shot");
         tableModel.addColumn("Subshot");
 
-        int currentSceneValue = 0;
-        int currentShotValue = 0;
-        int currentSubshotValue = 0;
-        
-        String scene = "";
-        String shot = "";
-        String subshot = "";
+    
 
-        String currentScene = "";
-        String currentShot = "";
-        String currentSubshot = "";
 
-       List<Integer> sceneChanges = detectScenes(filePath, width, height, numFrames, threshold);
-
-        for(int i = 0; i < sceneChanges.size(); i++){
-            scene = extractScene(data[i], currentSceneValue);
-            shot = extractShot(data[i], currentShotValue);
-            subshot = extractSubshot(data[i],currentSubshotValue);
-  
-            //check for new scene
-            if(!scene.equals(currentScene)){
-                tableModel.addRow(new Object[]{"Scene " + scene, "", ""});
-                currentScene = scene;
-                currentSceneValue++;
-                currentShot = "";
-                currentShotValue = 0;
-                currentSubshot = "";
-                currentSubshotValue = 0;
-            }
-
-            //check for new shot
-            if(!shot.equals(currentShot)){
-                tableModel.addRow(new Object[]{"", "shot " + shot, ""});
-                currentShot = shot;
-                currentShotValue++;
-                currentSubshot = "";
-                currentSubshotValue = 0;
-            }
-
-             //check for new subshot
-             if(!subshot.equals(currentSubshot)){
-                tableModel.addRow(new Object[]{"", "", "subshot " + subshot});
-                currentSubshot = subshot;
-                currentSubshotValue++;
-            }
-
-        }
+      
 
         return tableModel;
     }
    
-    
-
-    private static String extractScene(byte videoData, int currentSceneValue){
-        int sceneValue = (videoData & 0xC0) >> 6;
-        if(sceneValue > 0){
-            currentSceneValue += sceneValue;
-        }
-        
-        return String.valueOf(currentSceneValue);
-    }
-
-    private static String extractShot(byte videoData, int currentShotValue){
-        int shotValue = (videoData & 0x38) >> 3;
-        if(shotValue > 0){
-            currentShotValue += shotValue;
-        }
-        
-        return String.valueOf(currentShotValue);
-    }
-
-    private static String extractSubshot(byte videoData, int currentSubshotValue){
-        int subshotValue = videoData & 0x07;
-        if(subshotValue > 0){
-            currentSubshotValue += subshotValue;
-        }
-        return String.valueOf(currentSubshotValue);
-    }
-
-    private static byte[] readRGBFile(String filePath, int currentFrame){
-        int width = 480;
-        int height = 270;
-        int fps = 30;
-        int numFrames = 8682;
-        //int threshold = 50000;
-        File file = new File(filePath);
-        byte[] data = null;
-
-        try {
-            RandomAccessFile raf = new RandomAccessFile(file, "r");
-            FileChannel channel = raf.getChannel();
-            ByteBuffer buffer = ByteBuffer.allocate(width * height * 3);
-            long frameStartTime = System.currentTimeMillis();
-            long frameDuration = 1000 / fps;
-           
-            //Set position based on current frame
-            if(currentFrame >=0 && currentFrame < numFrames){
-                int numBytesPerFrame = width * height * 3;
-                channel.position((long) currentFrame * numBytesPerFrame);
-            }
-            buffer.clear();
-            channel.read(buffer);
-            buffer.flip();
-            byte[] imageData = new byte[buffer.remaining()];
-            buffer.get(imageData);
-            data = imageData;
 
 
-        } catch(IOException e){
+
+    private static byte[] readRGBFrame(String filePath, int width, int height, int frameNumber){
+        byte[] data = new byte[width * height * 3];
+        try{
+            RandomAccessFile raf = new RandomAccessFile(filePath, "r");
+            raf.seek(frameNumber * width * height * 3);
+            raf.read(data);
+            raf.close();
+        }catch(IOException e){
             e.printStackTrace();
         }
         return data;
     }
-
-    private static List<Integer> detectScenes(String filePath, int width, int height, int numFrames, int threshold){
-        List<Integer> sceneChanges = new ArrayList<>();
-        byte[] prevFrameData = null;
-
-        //loop through each frame
-        for(int frameInd = 0; frameInd < numFrames; frameInd++){
-            byte[] currentFrameData = readRGBFile(filePath, frameInd);
-
-            //differencing
-            if(prevFrameData != null){
-                int numPixels = width * height * 3;
-                int numDiffferentPixels = 0;
-                for(int i = 0; i < numPixels; i++){
-                    if(Math.abs(currentFrameData[i]-prevFrameData[i]) > threshold){
-                        numDiffferentPixels++;
-                    }
-                }
-                
-                System.out.println("Frame " + frameInd + ": " + numDiffferentPixels + " different pixels");
-                //if pixels exceed threshold probably a new scene
-                if(numDiffferentPixels > threshold){
-                    sceneChanges.add(frameInd);
-                }
-
-            }
-            prevFrameData = currentFrameData;
-        }
-        return sceneChanges;
-    }
-
 
     public static void main(String[] args) {
         File file = new File("./InputVideo.rgb");
