@@ -30,6 +30,7 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 
 import javax.swing.JTable;
+import javax.swing.SwingUtilities;
 import javax.swing.JScrollPane;
 import javax.swing.table.DefaultTableModel;
 
@@ -50,6 +51,9 @@ public class VideoPlayer {
     private static boolean isPaused = false;
     private static boolean isStopped = false;
     private static int currentFrame = 0;
+
+    private static boolean autoUpdateTableSelection = true;
+
 
     public static void print(double [] array, int numFrames, int interval) {
     	for (int i = 0; i < (int) ((int) (numFrames/30) + 1)/interval + 1; i++) {
@@ -212,6 +216,8 @@ public class VideoPlayer {
 
             // Reset the audio stream at the new position
             resetAudioStream(audioPosition);
+            
+
             return targetFrame;
         }
     }
@@ -356,6 +362,7 @@ public class VideoPlayer {
         tableOfContents.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 1) {
+                    autoUpdateTableSelection = false;
                     int row = tableOfContents.getSelectedRow();
                     int col = tableOfContents.getSelectedColumn();
                     
@@ -394,6 +401,7 @@ public class VideoPlayer {
                     
                     System.out.println(scene + " " + shot + " " + subshot);
                     currentFrame = jumpToFrame(scene, shot, subshot, videoMetaData.frameNumbers);
+                    autoUpdateTableSelection = true;
                     // Update your targetFrame variable
                 }
             }
@@ -554,6 +562,7 @@ public class VideoPlayer {
             
                     // Set the position of the file channel based on currentFrame
                     channel.position((long) currentFrame * width * height * 3);
+                    
             
                     buffer.clear();
                     channel.read(buffer);
@@ -571,6 +580,9 @@ public class VideoPlayer {
                     }
             
                     label.setIcon(new ImageIcon(img));
+
+                    updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
+
             
                     if (!isPaused && !isStopped) {
                        
@@ -602,6 +614,24 @@ public class VideoPlayer {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static void updateSelectedRow(int currentFrame, JTable jTable, ArrayList<HashMap<String, Integer>> frameNumbers) {
+        int selectedIndex = getSelectedIndexForCurrentFrame(frameNumbers, currentFrame);
+        if (selectedIndex != -1 && selectedIndex != jTable.getSelectedRow()) {
+            jTable.setRowSelectionInterval(selectedIndex, selectedIndex);
+            jTable.scrollRectToVisible(jTable.getCellRect(selectedIndex, 0, true));
+        }
+    }
+
+    public static int getSelectedIndexForCurrentFrame(ArrayList<HashMap<String, Integer>> frameNumbers, int currentFrame) {
+        for (int i = 0; i < frameNumbers.size(); i++) {
+            HashMap<String, Integer> frameInfo = frameNumbers.get(i);
+            if (frameInfo.get("frame") == currentFrame) {
+                return i;
+            }
+        }
+        return -1;
     }
 
    
