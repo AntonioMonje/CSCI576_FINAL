@@ -48,6 +48,7 @@ public class VideoPlayer {
     private static Semaphore playSemaphore = new Semaphore(1);
 
     private static boolean isPaused = false;
+    private static boolean isStopped = false;
     private static int currentFrame = 0;
 
     public static void print(double [] array, int numFrames, int interval) {
@@ -449,8 +450,13 @@ public class VideoPlayer {
         JButton playButton = new JButton("Play");
         playButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                isPaused = !isPaused;
-                if (isPaused) {
+                if (isStopped){
+                    isPaused=false;
+                } else {
+                    isPaused = !isPaused;
+                }
+                isStopped=false;
+                if (isPaused || isStopped) {
                     sourceLine.flush();
                 } else {
                     playSemaphore.release();
@@ -476,8 +482,12 @@ public class VideoPlayer {
         JButton stopButton = new JButton("Stop");
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                pauseButton.doClick();
-                //jumpToFrame(0,0,0, 0);
+                isStopped=!isStopped;
+                if (isStopped) {
+                    sourceLine.flush();
+                } else {
+                    playSemaphore.release();
+                }
             }
         });
         controlPanel.add(stopButton);
@@ -520,13 +530,24 @@ public class VideoPlayer {
             ByteBuffer buffer = ByteBuffer.allocate(width * height * 3);
             long frameStartTime = System.currentTimeMillis();
             long frameDuration = 1000 / fps;
-
+            audioStream.mark(BUFFER_SIZE*numFrames);
+            int nBytesRead = 0;
+            byte[] abData = new byte[BUFFER_SIZE];
             for (; currentFrame < numFrames; currentFrame++) {
                 try {
                     playSemaphore.acquire();
                     if (isPaused) {
                         playSemaphore.release();
                         currentFrame--;
+                        continue;
+                    }
+
+                    if (isStopped){
+                        
+                        currentFrame=0;
+                        audioStream.reset();
+                        playSemaphore.release();
+                        channel.position(0);
                         continue;
                     }
                     playSemaphore.release();
@@ -551,15 +572,17 @@ public class VideoPlayer {
             
                     label.setIcon(new ImageIcon(img));
             
-                    if (!isPaused) {
-                        int nBytesRead = 0;
-                        byte[] abData = new byte[BUFFER_SIZE];
+                    if (!isPaused && !isStopped) {
+                       
+                        nBytesRead = 0;
+                        abData = new byte[BUFFER_SIZE];
                         nBytesRead = audioStream.read(abData, 0, CHUNK_SIZE);
                         if (nBytesRead >= 0) {
                             int nBytesWritten = sourceLine.write(abData, 0, nBytesRead);
                         }
                     }
             
+
                     long elapsedTime = System.currentTimeMillis() - frameStartTime;
                     long remainingTime = frameDuration - elapsedTime;
             
