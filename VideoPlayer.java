@@ -10,6 +10,7 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -205,6 +206,11 @@ public class VideoPlayer {
             return -1;
         } else {
             System.out.println("Jumping to frame: " + targetFrame);
+            // Calculate the audio position in bytes
+            long audioPosition = (long) (((double) targetFrame) / 30 * audioFormat.getFrameSize() * audioFormat.getFrameRate());
+
+            // Reset the audio stream at the new position
+            resetAudioStream(audioPosition);
             return targetFrame;
         }
     }
@@ -289,6 +295,20 @@ public class VideoPlayer {
             e.printStackTrace();
         }
         return data;
+    }
+
+    private static void resetAudioStream(long position) {
+        try {
+            if (audioStream != null) {
+                audioStream.close();
+            }
+            audioStream = AudioSystem.getAudioInputStream(new File("./InputAudio.wav"));
+            audioStream.skip(position);
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (UnsupportedAudioFileException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {
