@@ -358,6 +358,65 @@ public class VideoPlayer {
         	else if (processed[i] == 3) System.out.println("Scene");
         	else System.out.println();
         }
+        int current = 0;
+        int scene = 0;
+        int shot = 0;
+        int subshot = 0;
+        for (int i = 1; i < (int) (numFrames/fps) ; i++) {
+        	if (processed[i] != 0) {
+        		if (processed[current] == 3) {
+            		if (processed[i] == 1) {
+            			processed[current] = 6;
+            		}
+            		else if (processed[i] == 2) {
+            			processed[current] = 4;
+            		}
+            	}
+        		else if (processed[current] == 2) {
+        			if (processed[i] == 1) {
+        				processed[current] = 5;
+        			}
+        		}
+        		current = i;
+        	}
+        }
+        for (int i = 0; i < (int) (numFrames/fps) ; i++) {
+        	System.out.print("Time: "+ (int) i/60 + ":"+i%60+ ": ");
+        	if (processed[i] == 1) {
+        		subshot++;
+        		System.out.println("Subshot " + subshot);
+        	}
+        	else if (processed[i] == 2) {
+        		shot++;
+        		subshot = 0;
+        		System.out.println("Shot " + shot);
+        	}
+        	else if (processed[i] == 3) {
+        		scene++;
+        		shot = 0;
+        		subshot = 0;
+        		System.out.println("Scene " + scene);
+        	}
+        	else if (processed[i] == 4) {
+        		scene++;
+        		shot = 1;
+        		subshot = 0;
+        		System.out.println("Scene " + scene + " Shot " + shot);
+        	}
+        	else if (processed[i] == 5) {
+        		shot++;
+        		subshot = 1;
+        		System.out.println("Shot " + shot + " Subshot " + subshot);
+        	}
+        	else if (processed[i] == 6) {
+        		scene++;
+        		shot = 1;
+        		subshot = 1;
+        		System.out.println("Scene " + scene + " Shot " + shot 
+        				+ " Subshot " + subshot);
+        	}
+        	else System.out.println();
+        }
 
         tableOfContents.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
