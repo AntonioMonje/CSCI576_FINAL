@@ -68,7 +68,6 @@ public class VideoPlayer {
     	double max = 0;
     	for (int i = 0; i < count; i++) {
     		if (array[i] > max) max = array[i];
-    		//newArray[index] = newArray[index] + array[i];
     		if (i % interval == interval - 1) {
         		newArray[index] = max;
         		index++;
@@ -82,7 +81,6 @@ public class VideoPlayer {
     	double newArray [] = new double [((int) count/interval) + 2];
     	int index = 0;
     	for (int i = 0; i < count; i++) {
-    		//System.out.println(array[i]);
     		newArray[index] = newArray[index] + array[i];
     		if (i % interval == interval - 1) {
         		newArray[index] = newArray[index]/interval;
@@ -99,15 +97,10 @@ public class VideoPlayer {
     		sd = sd + Math.pow((array[i] - average), 2);
     	}
     	sd = Math.sqrt(sd/count);
-    	//System.out.println("average: "+ average);
-    	//System.out.println("sd: "+ sd);
     	return sd;
     }
     
     public static int [] process(File file, int width, int height, int fps, int numFrames, JFrame frame) {
-    	int nBytesRead = 0;
-        byte[] abData = new byte[BUFFER_SIZE];
-        int index = 0;
         
         try {
         	RandomAccessFile raf = new RandomAccessFile(file, "r");
@@ -118,11 +111,16 @@ public class VideoPlayer {
             int previousB [][] = new int [width][height];
             double differences [] = new double [numFrames];
             double seconds [] = new double [(int) (numFrames/fps) + 1];
-            double shots [] = new double [(int) ((int) (numFrames/fps) + 1)/3 + 1];
-            double scenes [] = new double [(int) ((int) (numFrames/fps) + 1)/10 + 1];
-            double jumps [] = new double [(int) (numFrames/fps) + 2];
-            double scenejumps [] = new double [(int) ((int) (numFrames/fps) + 1)/10 + 1];
+            double seconds2 [] = new double [(int) (numFrames/fps) + 1];
             int processed [] = new int [(int) (numFrames/fps)];
+            double totalR;
+            double totalG;
+            double totalB;
+            double previousTotalR = 0;
+            double previousTotalG = 0;
+            double previousTotalB = 0;
+            double colorDifferences [] = new double [numFrames];
+            double lowest;
 
             //initialize seconds array with zeros
             for(int i = 0; i < seconds.length; i++)
@@ -134,6 +132,9 @@ public class VideoPlayer {
             	buffer.clear();
                 channel.read(buffer);
                 buffer.rewind();
+                totalR = 0;
+                totalG = 0;
+                totalB = 0;
                 for (int y = 0; y < height; y++) {
                     for (int x = 0; x < width; x++) {
                         int r = buffer.get() & 0xff;
@@ -144,46 +145,56 @@ public class VideoPlayer {
                         previousR [x][y] = r;
                         previousG [x][y] = g;
                         previousB [x][y] = b;
+                        totalR = totalR + r;
+                        totalG = totalG + g;
+                        totalB = totalB + b;
                     }
                 }
                 differences[i] = differences[i]/(width * height);
+                
+                lowest = totalR;
+                if (totalG < lowest) lowest = totalG;
+                if (totalB < lowest) lowest = totalB;
+                totalR = totalR/lowest;
+                totalG = totalG/lowest;
+                totalB = totalB/lowest;
+                colorDifferences[i] = (Math.abs(totalR - previousTotalR) 
+                		+ Math.abs(totalG - previousTotalG) + Math.abs(totalB - previousTotalB))*100;
+                previousTotalR = totalR;
+                previousTotalG = totalG;
+                previousTotalB = totalB;
+                //System.out.println("Frame: "+ i+ " r: " + totalR + " g: " + totalG + " b: " + totalB);
                 frame.validate();
                 frame.repaint();
             }
-            //seconds = average(differences, numFrames, fps);
             seconds = max(differences, numFrames, fps);
-            for (int i = 0; i < (int) (numFrames/fps) ; i++) {
-            	if (i != 0) {
-            		jumps[i] = Math.abs(seconds[i] - seconds[i - 1]);
-            	}
-            	else jumps[i] = seconds[i];
-            }
-            shots = average(seconds, numFrames/fps, 3);
-            scenes = average(seconds, numFrames/fps, 10);
-            scenejumps = average(jumps, numFrames/fps, 10);
+            seconds2 = max(colorDifferences, numFrames, fps);
            
             double sd = sd(seconds, (int) ((int) (numFrames/fps) + 1)/1 - 1);
             double average = average(seconds, (int) ((int) (numFrames/fps) + 1)/1 - 1, 
             		(int) ((int) (numFrames/fps) + 1)/1 - 1)[0];
+            double sd2 = sd(seconds2, (int) ((int) (numFrames/fps) + 1)/1 - 1);
+            double average2 = average(seconds2, (int) ((int) (numFrames/fps) + 1)/1 - 1, 
+            		(int) ((int) (numFrames/fps) + 1)/1 - 1)[0];
+            /*
             System.out.println("Average: " + average);
             System.out.println("Standard Deviation: " + sd);
+            System.out.println("Average 2: " + average2);
+            System.out.println("Standard Deviation 2: " + sd2);*/
+            //for (int i = 0; i < (int) ((int) (numFrames/30) + 1)/1 - 1; i++) {
+            //	System.out.println(seconds[i]);
+            //}
            
             processed[0] = 3; //First second should always be new scene
             for (int i = 1; i < (int) (numFrames/fps) ; i++) {
-            	if (seconds[i] > average + 2*sd) processed[i] = 3;
-            	else if (seconds[i] > average + sd - 1) processed[i] = 2;
+            	if (seconds[i] > average + sd - 1) processed[i] = 2;
             	else if (seconds[i] > average) processed[i] = 1;
             	else processed[i] = 0;
+            	if (seconds2[i] > average2 + sd2) processed[i] = 3;
             }
             channel.close();
             raf.close();
-            for (int i = 0; i < (int) (numFrames/fps) ; i++) {
-            	System.out.print("Time: "+ (int) i/60 + ":"+i%60+ ": ");
-            	if (processed[i] == 1) System.out.println("Subshot");
-            	else if (processed[i] == 2) System.out.println("Shot");
-            	else if (processed[i] == 3) System.out.println("Scene");
-            	else System.out.println();
-            }
+
             int current = 0;
             int scene = 0;
             int shot = 0;
@@ -206,6 +217,7 @@ public class VideoPlayer {
             		current = i;
             	}
             }
+            
             for (int i = 0; i < (int) (numFrames/fps) ; i++) {
             	System.out.print("Time: "+ (int) i/60 + ":"+i%60+ ": ");
             	if (processed[i] == 1) {
