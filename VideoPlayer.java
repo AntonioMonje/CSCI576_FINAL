@@ -3,6 +3,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.awt.image.BufferedImage;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
@@ -68,7 +69,6 @@ public class VideoPlayer {
     	double max = 0;
     	for (int i = 0; i < count; i++) {
     		if (array[i] > max) max = array[i];
-    		//newArray[index] = newArray[index] + array[i];
     		if (i % interval == interval - 1) {
         		newArray[index] = max;
         		index++;
@@ -82,7 +82,6 @@ public class VideoPlayer {
     	double newArray [] = new double [((int) count/interval) + 2];
     	int index = 0;
     	for (int i = 0; i < count; i++) {
-    		//System.out.println(array[i]);
     		newArray[index] = newArray[index] + array[i];
     		if (i % interval == interval - 1) {
         		newArray[index] = newArray[index]/interval;
@@ -99,15 +98,10 @@ public class VideoPlayer {
     		sd = sd + Math.pow((array[i] - average), 2);
     	}
     	sd = Math.sqrt(sd/count);
-    	//System.out.println("average: "+ average);
-    	//System.out.println("sd: "+ sd);
     	return sd;
     }
     
     public static int [] process(File file, int width, int height, int fps, int numFrames, JFrame frame) {
-    	int nBytesRead = 0;
-        byte[] abData = new byte[BUFFER_SIZE];
-        int index = 0;
         
         try {
         	RandomAccessFile raf = new RandomAccessFile(file, "r");
@@ -117,12 +111,17 @@ public class VideoPlayer {
             int previousG [][] = new int [width][height];
             int previousB [][] = new int [width][height];
             double differences [] = new double [numFrames];
-            double seconds [] = new double [(int) (numFrames/30) + 1];
-            double shots [] = new double [(int) ((int) (numFrames/30) + 1)/3 + 1];
-            double scenes [] = new double [(int) ((int) (numFrames/30) + 1)/10 + 1];
-            double jumps [] = new double [(int) (numFrames/30) + 2];
-            double scenejumps [] = new double [(int) ((int) (numFrames/30) + 1)/10 + 1];
-            int processed [] = new int [(int) (numFrames/30)];
+            double seconds [] = new double [(int) (numFrames/fps) + 1];
+            double seconds2 [] = new double [(int) (numFrames/fps) + 1];
+            int processed [] = new int [(int) (numFrames/fps)];
+            double totalR;
+            double totalG;
+            double totalB;
+            double previousTotalR = 0;
+            double previousTotalG = 0;
+            double previousTotalB = 0;
+            double colorDifferences [] = new double [numFrames];
+            double lowest;
 
             //initialize seconds array with zeros
             for(int i = 0; i < seconds.length; i++)
@@ -134,6 +133,9 @@ public class VideoPlayer {
             	buffer.clear();
                 channel.read(buffer);
                 buffer.rewind();
+                totalR = 0;
+                totalG = 0;
+                totalB = 0;
                 for (int y = 0; y < height; y++) {
                     for (int x = 0; x < width; x++) {
                         int r = buffer.get() & 0xff;
@@ -144,39 +146,116 @@ public class VideoPlayer {
                         previousR [x][y] = r;
                         previousG [x][y] = g;
                         previousB [x][y] = b;
+                        totalR = totalR + r;
+                        totalG = totalG + g;
+                        totalB = totalB + b;
                     }
                 }
                 differences[i] = differences[i]/(width * height);
+                
+                lowest = totalR;
+                if (totalG < lowest) lowest = totalG;
+                if (totalB < lowest) lowest = totalB;
+                totalR = totalR/lowest;
+                totalG = totalG/lowest;
+                totalB = totalB/lowest;
+                colorDifferences[i] = (Math.abs(totalR - previousTotalR) 
+                		+ Math.abs(totalG - previousTotalG) + Math.abs(totalB - previousTotalB))*100;
+                previousTotalR = totalR;
+                previousTotalG = totalG;
+                previousTotalB = totalB;
+                //System.out.println("Frame: "+ i+ " r: " + totalR + " g: " + totalG + " b: " + totalB);
                 frame.validate();
                 frame.repaint();
             }
-            //seconds = average(differences, numFrames, fps);
             seconds = max(differences, numFrames, fps);
-            for (int i = 0; i < (int) (numFrames/30) ; i++) {
-            	if (i != 0) {
-            		jumps[i] = Math.abs(seconds[i] - seconds[i - 1]);
-            	}
-            	else jumps[i] = seconds[i];
-            }
-            shots = average(seconds, numFrames/30, 3);
-            scenes = average(seconds, numFrames/30, 10);
-            scenejumps = average(jumps, numFrames/30, 10);
+            seconds2 = max(colorDifferences, numFrames, fps);
            
-            double sd = sd(seconds, (int) ((int) (numFrames/30) + 1)/1 - 1);
-            double average = average(seconds, (int) ((int) (numFrames/30) + 1)/1 - 1, 
-            		(int) ((int) (numFrames/30) + 1)/1 - 1)[0];
+            double sd = sd(seconds, (int) ((int) (numFrames/fps) + 1)/1 - 1);
+            double average = average(seconds, (int) ((int) (numFrames/fps) + 1)/1 - 1, 
+            		(int) ((int) (numFrames/fps) + 1)/1 - 1)[0];
+            double sd2 = sd(seconds2, (int) ((int) (numFrames/fps) + 1)/1 - 1);
+            double average2 = average(seconds2, (int) ((int) (numFrames/fps) + 1)/1 - 1, 
+            		(int) ((int) (numFrames/fps) + 1)/1 - 1)[0];
+            /*
             System.out.println("Average: " + average);
             System.out.println("Standard Deviation: " + sd);
+            System.out.println("Average 2: " + average2);
+            System.out.println("Standard Deviation 2: " + sd2);*/
+            //for (int i = 0; i < (int) ((int) (numFrames/30) + 1)/1 - 1; i++) {
+            //	System.out.println(seconds[i]);
+            //}
            
             processed[0] = 3; //First second should always be new scene
-            for (int i = 1; i < (int) (numFrames/30) ; i++) {
-            	if (seconds[i] > average + 2*sd) processed[i] = 3;
-            	else if (seconds[i] > average + sd - 1) processed[i] = 2;
+            for (int i = 1; i < (int) (numFrames/fps) ; i++) {
+            	if (seconds[i] > average + sd - 1) processed[i] = 2;
             	else if (seconds[i] > average) processed[i] = 1;
             	else processed[i] = 0;
+            	if (seconds2[i] > average2 + sd2) processed[i] = 3;
             }
             channel.close();
             raf.close();
+
+            int current = 0;
+            int scene = 0;
+            int shot = 0;
+            int subshot = 0;
+            for (int i = 1; i < (int) (numFrames/fps) ; i++) {
+            	if (processed[i] != 0) {
+            		if (processed[current] == 3) {
+                		if (processed[i] == 1) {
+                			processed[current] = 6;
+                		}
+                		else if (processed[i] == 2) {
+                			processed[current] = 4;
+                		}
+                	}
+            		else if (processed[current] == 2) {
+            			if (processed[i] == 1) {
+            				processed[current] = 5;
+            			}
+            		}
+            		current = i;
+            	}
+            }
+            
+            for (int i = 0; i < (int) (numFrames/fps) ; i++) {
+            	System.out.print("Time: "+ (int) i/60 + ":"+i%60+ ": ");
+            	if (processed[i] == 1) {
+            		subshot++;
+            		System.out.println("Subshot " + subshot);
+            	}
+            	else if (processed[i] == 2) {
+            		shot++;
+            		subshot = 0;
+            		System.out.println("Shot " + shot);
+            	}
+            	else if (processed[i] == 3) {
+            		scene++;
+            		shot = 0;
+            		subshot = 0;
+            		System.out.println("Scene " + scene);
+            	}
+            	else if (processed[i] == 4) {
+            		scene++;
+            		shot = 1;
+            		subshot = 0;
+            		System.out.println("Scene " + scene + " Shot " + shot);
+            	}
+            	else if (processed[i] == 5) {
+            		shot++;
+            		subshot = 1;
+            		System.out.println("Shot " + shot + " Subshot " + subshot);
+            	}
+            	else if (processed[i] == 6) {
+            		scene++;
+            		shot = 1;
+            		subshot = 1;
+            		System.out.println("Scene " + scene + " Shot " + shot 
+            				+ " Subshot " + subshot);
+            	}
+            	else System.out.println();
+            }
             return processed;
         } catch (IOException e) {
             e.printStackTrace();
@@ -186,7 +265,7 @@ public class VideoPlayer {
     
 
     // Add a method to jump to a specific frame
-    public static int jumpToFrame(int scene, int shot, int subshot, ArrayList<HashMap<String, Integer>> frameNumbers) {
+    public static int jumpToFrame(int scene, int shot, int subshot, ArrayList<HashMap<String, Integer>> frameNumbers, String audioFilePath) {
         int targetFrame = -1;
         
         for (HashMap<String, Integer> frameInfo : frameNumbers) {
@@ -215,7 +294,7 @@ public class VideoPlayer {
             long audioPosition = (long) (((double) targetFrame) / 30 * audioFormat.getFrameSize() * audioFormat.getFrameRate());
 
             // Reset the audio stream at the new position
-            resetAudioStream(audioPosition);
+            resetAudioStream(audioPosition, audioFilePath);
             
 
             return targetFrame;
@@ -232,11 +311,8 @@ public class VideoPlayer {
         }
     }
 
-    public static VideoMetaData extractVideoMetaData(String filePath, int currentFrame) {
-        int width = 480;
-        int height = 270;
-        int fps = 30;
-        int numFrames = 8682;
+    public static VideoMetaData extractVideoMetaData(String filePath, int currentFrame, int width, int height,
+    		int fps, int numFrames) {
         DefaultTableModel tableModel = new DefaultTableModel();
         tableModel.addColumn("Scene");
         tableModel.addColumn("Shot");
@@ -251,6 +327,7 @@ public class VideoPlayer {
         int currentSubshot = -1;
     
         for (int i = 0; i < processed.length; i++) {
+        	//System.out.println(processed[i]);
             int currentFrameNumber = i * fps;
             if (processed[i] == 3) {
                 currentScene++;
@@ -282,6 +359,75 @@ public class VideoPlayer {
                 subshotFrame.put("subshot", currentSubshot);
                 subshotFrame.put("frame", currentFrameNumber);
                 frameNumbers.add(subshotFrame);
+            } else if (processed[i] == 6) {
+            	currentScene++;
+                currentShot = -1;
+                currentSubshot = -1;
+                tableModel.addRow(new Object[]{"Scene " + (currentScene + 1), "", ""});
+    
+                HashMap<String, Integer> sceneFrame = new HashMap<String, Integer>();
+                sceneFrame.put("scene", currentScene);
+                sceneFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(sceneFrame);
+                
+                currentShot++;
+                tableModel.addRow(new Object[]{"", "Shot " + (currentShot + 1), ""});
+    
+                HashMap<String, Integer> shotFrame = new HashMap<String, Integer>();
+                shotFrame.put("scene", currentScene);
+                shotFrame.put("shot", currentShot);
+                shotFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(shotFrame);
+                
+                currentSubshot++;
+                tableModel.addRow(new Object[]{"", "", "Subshot " + (currentSubshot + 1)});
+    
+                HashMap<String, Integer> subshotFrame = new HashMap<String, Integer>();
+                subshotFrame.put("scene", currentScene);
+                subshotFrame.put("shot", currentShot);
+                subshotFrame.put("subshot", currentSubshot);
+                subshotFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(subshotFrame);
+            } else if (processed[i] == 5) {
+            	currentShot++;
+                currentSubshot = -1;
+                tableModel.addRow(new Object[]{"", "Shot " + (currentShot + 1), ""});
+    
+                HashMap<String, Integer> shotFrame = new HashMap<String, Integer>();
+                shotFrame.put("scene", currentScene);
+                shotFrame.put("shot", currentShot);
+                shotFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(shotFrame);
+                
+                currentSubshot++;
+                tableModel.addRow(new Object[]{"", "", "Subshot " + (currentSubshot + 1)});
+    
+                HashMap<String, Integer> subshotFrame = new HashMap<String, Integer>();
+                subshotFrame.put("scene", currentScene);
+                subshotFrame.put("shot", currentShot);
+                subshotFrame.put("subshot", currentSubshot);
+                subshotFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(subshotFrame);
+            } else if (processed[i] == 4) {
+            	currentScene++;
+                currentShot = -1;
+                currentSubshot = -1;
+                tableModel.addRow(new Object[]{"Scene " + (currentScene + 1), "", ""});
+    
+                HashMap<String, Integer> sceneFrame = new HashMap<String, Integer>();
+                sceneFrame.put("scene", currentScene);
+                sceneFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(sceneFrame);
+                
+                currentShot++;
+                currentSubshot = -1;
+                tableModel.addRow(new Object[]{"", "Shot " + (currentShot + 1), ""});
+    
+                HashMap<String, Integer> shotFrame = new HashMap<String, Integer>();
+                shotFrame.put("scene", currentScene);
+                shotFrame.put("shot", currentShot);
+                shotFrame.put("frame", currentFrameNumber);
+                frameNumbers.add(shotFrame);
             }
         }
     
@@ -304,12 +450,12 @@ public class VideoPlayer {
         return data;
     }
 
-    private static void resetAudioStream(long position) {
+    private static void resetAudioStream(long position, String audioFilePath) {
         try {
             if (audioStream != null) {
                 audioStream.close();
             }
-            audioStream = AudioSystem.getAudioInputStream(new File("./InputAudio.wav"));
+            audioStream = AudioSystem.getAudioInputStream(new File(audioFilePath));
             audioStream.skip(position);
         } catch (IOException e) {
             e.printStackTrace();
@@ -319,11 +465,14 @@ public class VideoPlayer {
     }
 
     public static void main(String[] args) {
-        File file = new File("./InputVideo.rgb");
+    	String videoFilePath = "./".concat(args[0]);
+    	String audioFilePath = "./".concat(args[1]);
+        File videoFile = new File(videoFilePath);
         int width = 480;
         int height = 270;
         int fps = 30;
-        int numFrames = 8682;
+        int numFrames = (int) (videoFile.length()/(3 * width * height));
+        System.out.println("numFrames: " + numFrames);
 
         //Contains location of all scenes, shots, and subshots
         int processed [] = new int [(int) (numFrames/30)];
@@ -346,77 +495,10 @@ public class VideoPlayer {
         JPanel tablePanel = new JPanel();
         frame.add(tablePanel, BorderLayout.WEST);
 
-         // Create a JTable with the sample data and column names
-         VideoMetaData videoMetaData = extractVideoMetaData("./InputVideo.rgb", currentFrame);
-         JTable tableOfContents = new JTable(videoMetaData.tableModel);
-
-        processed = process(file, width, height, fps, numFrames, frame);
-        for (int i = 0; i < (int) (numFrames/fps) ; i++) {
-        	System.out.print("Time: "+ (int) i/60 + ":"+i%60+ ": ");
-        	if (processed[i] == 1) System.out.println("Subshot");
-        	else if (processed[i] == 2) System.out.println("Shot");
-        	else if (processed[i] == 3) System.out.println("Scene");
-        	else System.out.println();
-        }
-        int current = 0;
-        int scene = 0;
-        int shot = 0;
-        int subshot = 0;
-        for (int i = 1; i < (int) (numFrames/fps) ; i++) {
-        	if (processed[i] != 0) {
-        		if (processed[current] == 3) {
-            		if (processed[i] == 1) {
-            			processed[current] = 6;
-            		}
-            		else if (processed[i] == 2) {
-            			processed[current] = 4;
-            		}
-            	}
-        		else if (processed[current] == 2) {
-        			if (processed[i] == 1) {
-        				processed[current] = 5;
-        			}
-        		}
-        		current = i;
-        	}
-        }
-        for (int i = 0; i < (int) (numFrames/fps) ; i++) {
-        	System.out.print("Time: "+ (int) i/60 + ":"+i%60+ ": ");
-        	if (processed[i] == 1) {
-        		subshot++;
-        		System.out.println("Subshot " + subshot);
-        	}
-        	else if (processed[i] == 2) {
-        		shot++;
-        		subshot = 0;
-        		System.out.println("Shot " + shot);
-        	}
-        	else if (processed[i] == 3) {
-        		scene++;
-        		shot = 0;
-        		subshot = 0;
-        		System.out.println("Scene " + scene);
-        	}
-        	else if (processed[i] == 4) {
-        		scene++;
-        		shot = 1;
-        		subshot = 0;
-        		System.out.println("Scene " + scene + " Shot " + shot);
-        	}
-        	else if (processed[i] == 5) {
-        		shot++;
-        		subshot = 1;
-        		System.out.println("Shot " + shot + " Subshot " + subshot);
-        	}
-        	else if (processed[i] == 6) {
-        		scene++;
-        		shot = 1;
-        		subshot = 1;
-        		System.out.println("Scene " + scene + " Shot " + shot 
-        				+ " Subshot " + subshot);
-        	}
-        	else System.out.println();
-        }
+        // Create a JTable with the sample data and column names
+        VideoMetaData videoMetaData = extractVideoMetaData(videoFilePath, currentFrame, 
+        		width, height, fps, numFrames);
+        JTable tableOfContents = new JTable(videoMetaData.tableModel);
 
         tableOfContents.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
@@ -459,7 +541,7 @@ public class VideoPlayer {
                     }
                     
                     System.out.println(scene + " " + shot + " " + subshot);
-                    currentFrame = jumpToFrame(scene, shot, subshot, videoMetaData.frameNumbers);
+                    currentFrame = jumpToFrame(scene, shot, subshot, videoMetaData.frameNumbers, audioFilePath);
                     autoUpdateTableSelection = true;
                     // Update your targetFrame variable
                 }
@@ -559,10 +641,8 @@ public class VideoPlayer {
         });
         controlPanel.add(stopButton);
 
-        String strFilename = "./InputAudio.wav";
-
         try {
-            soundFile = new File(strFilename);
+            soundFile = new File(audioFilePath);
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(1);
@@ -592,7 +672,7 @@ public class VideoPlayer {
         sourceLine.start();
 
         try {
-            RandomAccessFile raf = new RandomAccessFile(file, "r");
+            RandomAccessFile raf = new RandomAccessFile(videoFile, "r");
             FileChannel channel = raf.getChannel();
             ByteBuffer buffer = ByteBuffer.allocate(width * height * 3);
             long frameStartTime = System.currentTimeMillis();
