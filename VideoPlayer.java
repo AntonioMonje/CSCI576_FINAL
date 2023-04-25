@@ -49,7 +49,6 @@ public class VideoPlayer {
     private static Semaphore playSemaphore = new Semaphore(1);
 
     private static boolean isPaused = false;
-    private static boolean isStopped = false;
     private static int currentFrame = 0;
 
     private static boolean autoUpdateTableSelection = true;
@@ -287,7 +286,6 @@ public class VideoPlayer {
     
         return new VideoMetaData(tableModel, frameNumbers);
     }
-   
 
 
 
@@ -362,6 +360,8 @@ public class VideoPlayer {
         int scene = 0;
         int shot = 0;
         int subshot = 0;
+        
+
         for (int i = 1; i < (int) (numFrames/fps) ; i++) {
         	if (processed[i] != 0) {
         		if (processed[current] == 3) {
@@ -380,6 +380,7 @@ public class VideoPlayer {
         		current = i;
         	}
         }
+
         for (int i = 0; i < (int) (numFrames/fps) ; i++) {
         	System.out.print("Time: "+ (int) i/60 + ":"+i%60+ ": ");
         	if (processed[i] == 1) {
@@ -459,6 +460,7 @@ public class VideoPlayer {
                     }
                     
                     System.out.println(scene + " " + shot + " " + subshot);
+                    
                     currentFrame = jumpToFrame(scene, shot, subshot, videoMetaData.frameNumbers);
                     autoUpdateTableSelection = true;
                     // Update your targetFrame variable
@@ -517,13 +519,8 @@ public class VideoPlayer {
         JButton playButton = new JButton("Play");
         playButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                if (isStopped){
-                    isPaused=false;
-                } else {
-                    isPaused = !isPaused;
-                }
-                isStopped=false;
-                if (isPaused || isStopped) {
+                isPaused = !isPaused;
+                if (isPaused) {
                     sourceLine.flush();
                 } else {
                     playSemaphore.release();
@@ -549,13 +546,32 @@ public class VideoPlayer {
         JButton stopButton = new JButton("Stop");
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                isStopped=!isStopped;
-                if (isStopped) {
-                    sourceLine.flush();
-                } else {
-                    playSemaphore.release();
+                /**
+                 * Loops through scenes and get the previous scene and shot that
+                 * is <= the current frame. 
+                 * Jump to the frame with the previous scene and shot and pause.
+                 */
+                Integer prevScene=0;
+                Integer prevShot=-1;
+                for (int i = 0; i < videoMetaData.frameNumbers.size(); i++) {
+                    HashMap<String, Integer> frameInfo = videoMetaData.frameNumbers.get(i);
+                    if (frameInfo.get("frame") <= currentFrame) {
+                        prevScene = frameInfo.get("scene"); 
+                        prevShot = frameInfo.get("shot");   
+                        if (prevShot == null ){
+                            prevShot = -1;
+                        }
+                    } else {
+                        break;
+                    }
                 }
-            }
+                
+                //System.out.println("CurrentFrame=" +currentFrame + " PrevScene=" + prevScene.toString() + " PrevShot=" +prevShot.toString());
+                currentFrame = jumpToFrame(prevScene, prevShot, -1, videoMetaData.frameNumbers);
+                updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
+                isPaused=true;
+                sourceLine.flush();
+            }       
         });
         controlPanel.add(stopButton);
 
@@ -609,19 +625,10 @@ public class VideoPlayer {
                         continue;
                     }
 
-                    if (isStopped){
-                        
-                        currentFrame=0;
-                        audioStream.reset();
-                        playSemaphore.release();
-                        channel.position(0);
-                        continue;
-                    }
                     playSemaphore.release();
             
                     // Set the position of the file channel based on currentFrame
                     channel.position((long) currentFrame * width * height * 3);
-                    
             
                     buffer.clear();
                     channel.read(buffer);
@@ -643,7 +650,7 @@ public class VideoPlayer {
                     updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
 
             
-                    if (!isPaused && !isStopped) {
+                    if (!isPaused) {
                        
                         nBytesRead = 0;
                         abData = new byte[BUFFER_SIZE];
@@ -652,7 +659,6 @@ public class VideoPlayer {
                             int nBytesWritten = sourceLine.write(abData, 0, nBytesRead);
                         }
                     }
-            
 
                     long elapsedTime = System.currentTimeMillis() - frameStartTime;
                     long remainingTime = frameDuration - elapsedTime;
