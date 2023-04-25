@@ -188,10 +188,13 @@ public class VideoPlayer {
            
             processed[0] = 3; //First second should always be new scene
             for (int i = 1; i < (int) (numFrames/fps) ; i++) {
-            	if (seconds[i] > average + sd - 1) processed[i] = 2;
+            	if (seconds[i] > average + sd * 0.5) {
+            		processed[i] = 2;
+            		if (seconds2[i] > average2 + sd2) processed[i] = 3;
+            	}
             	else if (seconds[i] > average) processed[i] = 1;
             	else processed[i] = 0;
-            	if (seconds2[i] > average2 + sd2) processed[i] = 3;
+            	//if (seconds2[i] > average2 + sd2) processed[i] = 3;
             }
             channel.close();
             raf.close();
