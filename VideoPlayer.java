@@ -112,6 +112,7 @@ public class VideoPlayer {
             double differences [] = new double [numFrames];
             double seconds [] = new double [(int) (numFrames/fps) + 1];
             double seconds2 [] = new double [(int) (numFrames/fps) + 1];
+            double seconds3 [] = new double [(int) (numFrames/fps) + 1];
             int processed [] = new int [(int) (numFrames/fps)];
             double totalR;
             double totalG;
@@ -121,6 +122,8 @@ public class VideoPlayer {
             double previousTotalB = 0;
             double colorDifferences [] = new double [numFrames];
             double lowest;
+            double intensities [] = new double [numFrames];
+            double previousIntensity = 0;
 
             //initialize seconds array with zeros
             for(int i = 0; i < seconds.length; i++)
@@ -155,6 +158,8 @@ public class VideoPlayer {
                 lowest = totalR;
                 if (totalG < lowest) lowest = totalG;
                 if (totalB < lowest) lowest = totalB;
+                intensities [i] = Math.abs(((totalR + totalG + totalB)/(width * height)) - previousIntensity);
+                previousIntensity = ((totalR + totalG + totalB)/(width * height));
                 totalR = totalR/lowest;
                 totalG = totalG/lowest;
                 totalB = totalB/lowest;
@@ -163,12 +168,13 @@ public class VideoPlayer {
                 previousTotalR = totalR;
                 previousTotalG = totalG;
                 previousTotalB = totalB;
-                //System.out.println("Frame: "+ i+ " r: " + totalR + " g: " + totalG + " b: " + totalB);
+                //System.out.println("Frame: "+ i+ " Time: "+ (int) i/30+ " r: " + totalR + " g: " + totalG + " b: " + totalB);
                 frame.validate();
                 frame.repaint();
             }
             seconds = max(differences, numFrames, fps);
             seconds2 = max(colorDifferences, numFrames, fps);
+            seconds3 = average(intensities, numFrames, fps);
            
             double sd = sd(seconds, (int) ((int) (numFrames/fps) + 1)/1 - 1);
             double average = average(seconds, (int) ((int) (numFrames/fps) + 1)/1 - 1, 
@@ -176,6 +182,12 @@ public class VideoPlayer {
             double sd2 = sd(seconds2, (int) ((int) (numFrames/fps) + 1)/1 - 1);
             double average2 = average(seconds2, (int) ((int) (numFrames/fps) + 1)/1 - 1, 
             		(int) ((int) (numFrames/fps) + 1)/1 - 1)[0];
+            double sd3 = sd(seconds3, (int) ((int) (numFrames/fps) + 1)/1 - 1);
+            double average3 = average(seconds3, (int) ((int) (numFrames/fps) + 1)/1 - 1, 
+            		(int) ((int) (numFrames/fps) + 1)/1 - 1)[0];
+            print(seconds3, numFrames, 1);
+            System.out.println("Average: " + average3);
+            System.out.println("Standard Deviation: " + sd3);
             /*
             System.out.println("Average: " + average);
             System.out.println("Standard Deviation: " + sd);
@@ -189,7 +201,7 @@ public class VideoPlayer {
             for (int i = 1; i < (int) (numFrames/fps) ; i++) {
             	if (seconds[i] > average + sd * 0.5) {
             		processed[i] = 2;
-            		if (seconds2[i] > average2 + sd2) processed[i] = 3;
+            		if (seconds2[i] > average2 + sd2 || seconds3[i] > average3 + 5 * sd3) processed[i] = 3;
             	}
             	else if (seconds[i] > average) processed[i] = 1;
             	else processed[i] = 0;
