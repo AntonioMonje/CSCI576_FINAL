@@ -48,7 +48,7 @@ public class VideoPlayer {
     private static AudioFormat audioFormat;
     private static SourceDataLine sourceLine;
     private static Semaphore playSemaphore = new Semaphore(1);
-
+    private static boolean isPlaying = true;
     private static boolean isPaused = false;
     private static int currentFrame = 0;
 
@@ -637,34 +637,45 @@ public class VideoPlayer {
 
 
         JButton stopButton = new JButton("Stop");
+        isPlaying = true;
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                /**
-                 * Loops through scenes and get the previous scene and shot that
-                 * is <= the current frame. 
-                 * Jump to the frame with the previous scene and shot and pause.
-                 */
-                Integer prevScene=0;
-                Integer prevShot=-1;
-                for (int i = 0; i < videoMetaData.frameNumbers.size(); i++) {
-                    HashMap<String, Integer> frameInfo = videoMetaData.frameNumbers.get(i);
-                    if (frameInfo.get("frame") <= currentFrame) {
-                        prevScene = frameInfo.get("scene"); 
-                        prevShot = frameInfo.get("shot");   
-                        if (prevShot == null ){
-                            prevShot = -1;
+                if(isPlaying){
+                    /**
+                    * Loops through scenes and get the previous scene and shot that
+                    * is <= the current frame. 
+                     * Jump to the frame with the previous scene and shot and pause.
+                     */
+                    Integer prevScene=0;
+                    Integer prevShot=-1;
+                    for (int i = 0; i < videoMetaData.frameNumbers.size(); i++) {
+                        HashMap<String, Integer> frameInfo = videoMetaData.frameNumbers.get(i);
+                        if (frameInfo.get("frame") <= currentFrame) {
+                            prevScene = frameInfo.get("scene"); 
+                            prevShot = frameInfo.get("shot");   
+                            if (prevShot == null ){
+                                prevShot = -1;
+                            }
+                        } else {
+                            break;
                         }
-                    } else {
-                        break;
                     }
-                }
                 
-                //System.out.println("CurrentFrame=" +currentFrame + " PrevScene=" + prevScene.toString() + " PrevShot=" +prevShot.toString());
-                currentFrame = jumpToFrame(prevScene, prevShot, -1, videoMetaData.frameNumbers, audioFilePath);
-                updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
-                isPaused=true;
-                sourceLine.flush();
-            }       
+                    //System.out.println("CurrentFrame=" +currentFrame + " PrevScene=" + prevScene.toString() + " PrevShot=" +prevShot.toString());
+                    currentFrame = jumpToFrame(prevScene, prevShot, -1, videoMetaData.frameNumbers, audioFilePath);
+                    updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
+                    isPaused = true;
+                    sourceLine.flush();
+                    isPlaying = false;
+                } else {
+                    //Jump to the beginning of the video and play
+                    currentFrame = jumpToFrame(0, -1, -1, videoMetaData.frameNumbers, audioFilePath);
+                    updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
+                    isPaused = false;
+                    sourceLine.flush();
+                    isPlaying = true;
+                }   
+            }   
         });
         controlPanel.add(stopButton);
 
@@ -697,7 +708,6 @@ public class VideoPlayer {
         }
 
         sourceLine.start();
-
         try {
             RandomAccessFile raf = new RandomAccessFile(videoFile, "r");
             FileChannel channel = raf.getChannel();
