@@ -701,63 +701,69 @@ public class VideoPlayer {
             audioStream.mark(BUFFER_SIZE*numFrames);
             int nBytesRead = 0;
             byte[] abData = new byte[BUFFER_SIZE];
-            for (; currentFrame < numFrames; currentFrame++) {
-                try {
-                    playSemaphore.acquire();
-                    if (isPaused) {
+            Boolean loop = true;
+            while (loop){    
+                for (; currentFrame < numFrames; currentFrame++) {
+                    try {
+                        playSemaphore.acquire();
+                        if (isPaused) {
+                            playSemaphore.release();
+                            currentFrame--;
+                            continue;
+                        }
+
                         playSemaphore.release();
-                        currentFrame--;
-                        continue;
-                    }
-
-                    playSemaphore.release();
-            
-                    // Set the position of the file channel based on currentFrame
-                    channel.position((long) currentFrame * width * height * 3);
-            
-                    buffer.clear();
-                    channel.read(buffer);
-                    buffer.flip();
-                    byte[] imageData = buffer.array();
-                    BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-                    int idx = 0;
-                    for (int y = 0; y < height; y++) {
-                        for (int x = 0; x < width; x++) {
-                            int r = imageData[idx++] & 0xFF;
-                            int g = imageData[idx++] & 0xFF;
-                            int b = imageData[idx++] & 0xFF;
-                            img.setRGB(x, y, (r << 16) | (g << 8) | b);
+                
+                        // Set the position of the file channel based on currentFrame
+                        channel.position((long) currentFrame * width * height * 3);
+                
+                        buffer.clear();
+                        channel.read(buffer);
+                        buffer.flip();
+                        byte[] imageData = buffer.array();
+                        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                        int idx = 0;
+                        for (int y = 0; y < height; y++) {
+                            for (int x = 0; x < width; x++) {
+                                int r = imageData[idx++] & 0xFF;
+                                int g = imageData[idx++] & 0xFF;
+                                int b = imageData[idx++] & 0xFF;
+                                img.setRGB(x, y, (r << 16) | (g << 8) | b);
+                            }
                         }
-                    }
-            
-                    label.setIcon(new ImageIcon(img));
+                
+                        label.setIcon(new ImageIcon(img));
 
-                    updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
+                        updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
 
-            
-                    if (!isPaused) {
-                       
-                        nBytesRead = 0;
-                        abData = new byte[BUFFER_SIZE];
-                        nBytesRead = audioStream.read(abData, 0, CHUNK_SIZE);
-                        if (nBytesRead >= 0) {
-                            int nBytesWritten = sourceLine.write(abData, 0, nBytesRead);
+                
+                        if (!isPaused) {
+                        
+                            nBytesRead = 0;
+                            abData = new byte[BUFFER_SIZE];
+                            nBytesRead = audioStream.read(abData, 0, CHUNK_SIZE);
+                            if (nBytesRead >= 0) {
+                                int nBytesWritten = sourceLine.write(abData, 0, nBytesRead);
+                            }
                         }
-                    }
 
-                    long elapsedTime = System.currentTimeMillis() - frameStartTime;
-                    long remainingTime = frameDuration - elapsedTime;
-            
-                    if (remainingTime > 0) {
-                        Thread.sleep(remainingTime);
+                        long elapsedTime = System.currentTimeMillis() - frameStartTime;
+                        long remainingTime = frameDuration - elapsedTime;
+                
+                        if (remainingTime > 0) {
+                            Thread.sleep(remainingTime);
+                        }
+                
+                        frameStartTime = System.currentTimeMillis();
+                    } catch (IOException | InterruptedException e) {
+                        e.printStackTrace();
                     }
-            
-                    frameStartTime = System.currentTimeMillis();
-                } catch (IOException | InterruptedException e) {
-                    e.printStackTrace();
                 }
+                currentFrame = jumpToFrame(0, -1, -1, videoMetaData.frameNumbers, audioFilePath);
+                updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
+                isPaused = true;
+                sourceLine.flush();
             }
-
             sourceLine.drain();
             sourceLine.close();
             audioStream.close();
