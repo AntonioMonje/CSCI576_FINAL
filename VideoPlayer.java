@@ -641,7 +641,21 @@ public class VideoPlayer {
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                     //Jump to the beginning of the video and play
-                    currentFrame = jumpToFrame(0, -1, -1, videoMetaData.frameNumbers, audioFilePath);
+                    Integer prevScene=0;
+                    Integer prevShot=-1;
+                    for (int i = 0; i < videoMetaData.frameNumbers.size(); i++) {
+                        HashMap<String, Integer> frameInfo = videoMetaData.frameNumbers.get(i);
+                        if (frameInfo.get("frame") <= currentFrame) {
+                            prevScene = frameInfo.get("scene"); 
+                            prevShot = frameInfo.get("shot");   
+                            if (prevShot == null ){
+                                prevShot = -1;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    currentFrame = jumpToFrame(prevScene, prevShot, -1, videoMetaData.frameNumbers, audioFilePath);
                     updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
                     isPaused = true;
                     sourceLine.flush();
