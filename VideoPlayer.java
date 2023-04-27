@@ -637,25 +637,15 @@ public class VideoPlayer {
 
 
         JButton stopButton = new JButton("Stop");
-        isPlaying = true;
+       
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                if(isPlaying){
-                //Jump to the beginning of the video and play
-                currentFrame = jumpToFrame(0, -1, -1, videoMetaData.frameNumbers, audioFilePath);
-                updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
-                isPaused = true;
-                sourceLine.flush();
-                isPlaying = false;
-                } else {
                     //Jump to the beginning of the video and play
                     currentFrame = jumpToFrame(0, -1, -1, videoMetaData.frameNumbers, audioFilePath);
                     updateSelectedRow(currentFrame, tableOfContents, videoMetaData.frameNumbers);
-                    isPaused = false;
+                    isPaused = true;
                     sourceLine.flush();
-                    isPlaying = true;
-                }   
-            }   
+            } 
         });
         controlPanel.add(stopButton);
 
